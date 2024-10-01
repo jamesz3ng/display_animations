@@ -54,8 +54,8 @@ void renderFrame(float A, float B) {
   float cosB = cos(B), sinB = sin(B);
 
   // Increase loop increments to lower resolution
-  float thetaSpacing = 0.30;  // Increased from 0.15
-  float phiSpacing = 0.10;    // Increased from 0.05
+  float thetaSpacing = 0.35;  // Increased from 0.15
+  float phiSpacing = 0.15;    // Increased from 0.05
 
   // Loop over theta and phi
   for (float theta = 0; theta < 2 * PI; theta += thetaSpacing) {  // Tube angle
