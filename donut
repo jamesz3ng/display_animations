@@ -1,0 +1,107 @@
+#include <TFT_eSPI.h>
+
+TFT_eSPI tft = TFT_eSPI();
+
+#define TFT_BL 4  // Backlight pin
+
+// Screen dimensions based on rotation
+const int screenWidth = 135;
+const int screenHeight = 240;
+
+// Torus parameters
+const float R1 = 8;   // Radius of the tube
+const float R2 = 20;  // Distance from the center of the tube to the center of the torus
+
+// Animation parameters
+float A = 0.0;  // Rotation angle around the X-axis
+float B = 0.0;  // Rotation angle around the Z-axis
+
+// Precomputed variables
+const float K2 = 150;  // Distance from the viewer to the torus
+const float K1 = 68 * K2 / (R1 + R2);
+
+void setup() {
+  Serial.begin(115200);
+
+  // Initialize the backlight
+  pinMode(TFT_BL, OUTPUT);
+  digitalWrite(TFT_BL, HIGH);  // Turn on the backlight
+
+  // Initialize the display
+  tft.init();
+  tft.setRotation(0);  // Portrait mode
+  tft.fillScreen(TFT_BLACK);
+}
+
+void loop() {
+  // Clear the screen
+  tft.fillScreen(TFT_BLACK);
+
+  // Render the torus
+  renderFrame(A, B);
+
+  // Update rotation angles
+  A += 0.05;
+  B += 0.03;
+
+  // Small delay for animation smoothness
+  delay(20);
+}
+
+void renderFrame(float A, float B) {
+  // Precompute sines and cosines of A and B
+  float cosA = cos(A), sinA = sin(A);
+  float cosB = cos(B), sinB = sin(B);
+
+  // Increase loop increments to lower resolution
+  float thetaSpacing = 0.30;  // Increased from 0.15
+  float phiSpacing = 0.10;    // Increased from 0.05
+
+  // Loop over theta and phi
+  for (float theta = 0; theta < 2 * PI; theta += thetaSpacing) {  // Tube angle
+    float cosTheta = cos(theta), sinTheta = sin(theta);
+
+    for (float phi = 0; phi < 2 * PI; phi += phiSpacing) {        // Circle angle
+      float cosPhi = cos(phi), sinPhi = sin(phi);
+
+      // Compute the 3D coordinates
+      float circleX = R2 + R1 * cosTheta;
+      float circleY = R1 * sinTheta;
+
+      // Final 3D coordinates after rotation
+      float x = circleX * (cosB * cosPhi + sinA * sinB * sinPhi) - circleY * cosA * sinB;
+      float y = circleX * (sinB * cosPhi - sinA * cosB * sinPhi) + circleY * cosA * cosB;
+      float z = K2 + cosA * circleX * sinPhi + circleY * sinA;
+      float ooz = 1 / z;  // "One over z"
+
+      // 2D projection coordinates
+      int xp = (int)(screenWidth / 2 + K1 * ooz * x);
+      int yp = (int)(screenHeight / 2 - K1 * ooz * y);  // Inverted y-axis
+
+      // Skip points outside the screen
+      if (xp < 0 || xp >= screenWidth || yp < 0 || yp >= screenHeight) {
+        continue;
+      }
+
+      // Compute luminance (simple shading)
+      float L = cosPhi * cosTheta * sinB - cosA * cosTheta * sinPhi -
+                sinA * sinTheta + cosB * (cosA * sinTheta - cosTheta * sinA * sinPhi);
+
+      // Choose color based on luminance
+      uint16_t color = getColor(L);
+
+      // Draw the pixel
+      tft.drawPixel(xp, yp, color);
+    }
+  }
+}
+
+uint16_t getColor(float luminance) {
+  // Normalize luminance to 0-255
+  int L = (int)((luminance + 1.0) * 127.5);
+  if (L < 0) L = 0;
+  if (L > 255) L = 255;
+
+  // Map luminance to a grayscale color
+  return tft.color565(L, L, L);  // Grayscale color
+}
